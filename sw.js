@@ -15,53 +15,59 @@ async function getJoinedEngine() {
 
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
-    
-    // This gets the base path of the Service Worker (e.g., "/my-repo-name/")
-    const swScope = self.registration.scope;
-    const scopePath = new URL(swScope).pathname;
 
-    // Check if the request includes 'html5game/'
     if (url.pathname.includes('html5game/')) {
         event.respondWith((async () => {
             try {
                 const zip = await loadAndMergeZips();
                 
-                // FIX: Extract the path relative to the html5game folder
-                // This strips everything before 'html5game/' regardless of the repo name
-                const relativePath = url.pathname.substring(url.pathname.indexOf('html5game/'));
+                // NORMALIZE PATH: 
+                // This finds "html5game/..." even if the URL is "/repo/html5game/..."
+                const match = url.pathname.match(/html5game\/.+$/);
+                if (!match) return fetch(event.request);
                 
-                // ... inside your fetch event listener ...
+                const relativePath = match[0]; 
                 
-                const file = zip.file(relativePath);
-                if (!file) return fetch(event.request);
-                
-                // 1. Get the raw content
+                // Try to find the file. If not found, try stripping "html5game/" 
+                // just in case the zip was made without the root folder.
+                // even though that won't happen because the archives are correct. They even work locally, just not on GitHub Pages.
+                let file = zip.file(relativePath);
+                if (!file) {
+                    const flatPath = relativePath.replace('html5game/', '');
+                    file = zip.file(flatPath);
+                }
+
+                if (!file) {
+                    console.error(`[SW] 404 - Not in ZIP: ${relativePath}`);
+                    return new Response("Not Found", { status: 404 });
+                }
+
                 const content = await file.async('uint8array');
+                const extension = relativePath.split('.').pop().toLowerCase();
                 
-                // 2. CLONE the data before creating the Response
-                // content.slice() creates a new memory allocation so the original isn't detached
-                const clonedContent = content.slice();
-                
-                const ext = relativePath.split('.').pop().toLowerCase();
-                const type = mimeTypes[ext] || 'application/octet-stream';
-                
-                return new Response(clonedContent, {
+                // AUDIO FIX: Browsers are extremely picky about MIME types for decoding
+                let type = mimeTypes[extension] || 'application/octet-stream';
+                if (extension === 'ogg') type = 'audio/ogg';
+                if (extension === 'mp3') type = 'audio/mpeg';
+                if (extension === 'wav') type = 'audio/wav';
+
+                return new Response(content.slice(), {
                     status: 200,
                     headers: { 
                         'Content-Type': type,
-                        'Content-Length': clonedContent.length.toString()
+                        'Content-Length': content.length.toString(),
+                        'Accept-Ranges': 'bytes' // Crucial for audio seeking
                     }
                 });
             } catch (err) {
+                console.error("[SW] Fetch Error:", err);
                 return fetch(event.request);
             }
         })());
-        return; // Exit fetch listener
+        return;
     }
 
-    // Handle the UT.js chunks (also path-aware)
     if (url.pathname.endsWith('UT.js')) {
         event.respondWith(getJoinedEngine());
     }
 });
-
