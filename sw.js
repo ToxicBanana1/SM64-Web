@@ -77,16 +77,37 @@ self.addEventListener('fetch', event => {
             try {
                 const zip = await loadAndMergeZips();
                 
-                // Identify the file path inside the ZIP
+                // ... inside the fetch listener, inside the try block ...
+                
                 const match = url.pathname.match(/html5game\/.+$/);
                 if (!match) return fetch(event.request);
-                const relativePath = match[0];
-
-                const file = zip.file(relativePath);
+                
+                // 1. Normalize the path requested by the browser
+                // This ensures we use forward slashes and removes any double slashes
+                const requestedPath = match[0].replace(/\\/g, '/').replace(/\/+/g, '/');
+                
+                // 2. THE FUZZY FINDER:
+                // Look for an exact match first, then a match without the leading folder
+                let file = zip.file(requestedPath);
+                
                 if (!file) {
-                    console.error(`[SW] 404 - Not in ZIP: ${relativePath}`);
-                    return new Response("Asset not found in ZIP", { status: 404 });
+                    // If not found, look through all files in the ZIP to find a name match
+                    const fileName = requestedPath.split('/').pop();
+                    file = zip.file(new RegExp(fileName + '$', 'i'))[0]; 
                 }
+                
+                if (!file) {
+                    // LAST RESORT: Log all files currently in the ZIP to help us debug
+                    console.error(`[SW] 404 - Not in ZIP: ${requestedPath}`);
+                    // Only log the full list once so we don't crash the console
+                    if (!self.hasLoggedZipContents) {
+                        console.log("Files found in ZIP:", Object.keys(zip.files));
+                        self.hasLoggedZipContents = true;
+                    }
+                    return new Response("Asset not found", { status: 404 });
+                }
+                
+                // ... proceed with content.slice() and the Response ...
 
                 // Get content and SLICE it to prevent DataCloneError
                 const content = await file.async('uint8array');
@@ -110,3 +131,4 @@ self.addEventListener('fetch', event => {
         })());
     }
 });
+
