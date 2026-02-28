@@ -14,8 +14,8 @@ async function getJoinedEngine() {
 
 
 self.addEventListener('fetch', event => {
-    console.log(`[SW] Requesting: ${url.pathname} | Cleaned: ${url.pathname.match(/html5game\/.+$/)?.[0]}`);
     const url = new URL(event.request.url);
+    console.log(`[SW] Requesting: ${url.pathname} | Cleaned: ${url.pathname.match(/html5game\/.+$/)?.[0]}`);
 
     if (url.pathname.includes('html5game/')) {
         event.respondWith((async () => {
@@ -72,4 +72,5 @@ self.addEventListener('fetch', event => {
         event.respondWith(getJoinedEngine());
     }
 });
+
 
