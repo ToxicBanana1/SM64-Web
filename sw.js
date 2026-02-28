@@ -1,5 +1,17 @@
 importScripts('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
 
+// Add this at the top of sw.js
+self.addEventListener('install', event => {
+    // Forces the waiting service worker to become the active service worker
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+    // Allows the service worker to start intercepting requests immediately
+    // without requiring a page reload
+    event.waitUntil(self.clients.claim());
+});
+
 // 1. SETTINGS - Update these to match your file names
 const zipFiles = ['assets1.zip', 'assets2.zip', 'assets3.zip', 'assets4.zip', 'assets5.zip', 'assets6.zip']; 
 const engineParts = ['UT.js.part1', 'UT.js.part2'];
@@ -128,6 +140,7 @@ self.addEventListener('fetch', event => {
         })());
     }
 });
+
 
 
 
