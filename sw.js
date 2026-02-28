@@ -30,21 +30,26 @@ self.addEventListener('fetch', event => {
                 // This strips everything before 'html5game/' regardless of the repo name
                 const relativePath = url.pathname.substring(url.pathname.indexOf('html5game/'));
                 
+                // ... inside your fetch event listener ...
+                
                 const file = zip.file(relativePath);
-                if (!file) {
-                    console.warn(`[SW] Not in ZIP: ${relativePath}`);
-                    return fetch(event.request);
-                }
-
+                if (!file) return fetch(event.request);
+                
+                // 1. Get the raw content
                 const content = await file.async('uint8array');
+                
+                // 2. CLONE the data before creating the Response
+                // content.slice() creates a new memory allocation so the original isn't detached
+                const clonedContent = content.slice();
+                
                 const ext = relativePath.split('.').pop().toLowerCase();
                 const type = mimeTypes[ext] || 'application/octet-stream';
-
-                return new Response(content, {
+                
+                return new Response(clonedContent, {
                     status: 200,
                     headers: { 
                         'Content-Type': type,
-                        'Content-Length': content.length.toString()
+                        'Content-Length': clonedContent.length.toString()
                     }
                 });
             } catch (err) {
@@ -59,3 +64,4 @@ self.addEventListener('fetch', event => {
         event.respondWith(getJoinedEngine());
     }
 });
+
