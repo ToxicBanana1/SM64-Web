@@ -1,7 +1,7 @@
 importScripts('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
 
 // 1. SETTINGS - Update these to match your file names
-const zipFiles = ['assets1.zip', 'assets2.zip']; 
+const zipFiles = ['assets1.zip', 'assets2.zip', 'assets3.zip', 'assets4.zip', 'assets5.zip', 'assets6.zip']; 
 const engineParts = ['UT.js.part1', 'UT.js.part2'];
 
 const mimeTypes = {
@@ -131,4 +131,5 @@ self.addEventListener('fetch', event => {
         })());
     }
 });
+
 
