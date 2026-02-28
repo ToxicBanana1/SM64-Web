@@ -1,7 +1,7 @@
 importScripts('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
 
-const zipFiles = ['assets1.zip', 'assets2.zip']; // Update this list!
-const engineParts = ['UT.js.part1', 'UT.js.part2']; // The chunks created by Python
+const zipFiles = ['assets1.zip', 'assets2.zip', 'assets3.zip', 'assets4.zip', 'assets5.zip', 'assets6.zip'];
+const engineParts = ['UT.js.part1', 'UT.js.part2'];
 
 let masterZip = null;
 
@@ -12,31 +12,50 @@ async function getJoinedEngine() {
     return new Response(blob);
 }
 
-// ... (keep the loadAndMergeZips function from previous response) ...
 
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
+    
+    // This gets the base path of the Service Worker (e.g., "/my-repo-name/")
+    const swScope = self.registration.scope;
+    const scopePath = new URL(swScope).pathname;
 
-    // 1. Handle the Engine (UT.js)
-    if (url.pathname.endsWith('UT.js')) {
-        event.respondWith(getJoinedEngine());
-        return;
-    }
-
-    // 2. Handle the Assets (html5game/)
+    // Check if the request includes 'html5game/'
     if (url.pathname.includes('html5game/')) {
         event.respondWith((async () => {
-            const zip = await loadAndMergeZips();
-            const relativePath = url.pathname.substring(url.pathname.indexOf('html5game/'));
-            const file = zip.file(relativePath);
-            
-            if (!file) return fetch(event.request);
+            try {
+                const zip = await loadAndMergeZips();
+                
+                // FIX: Extract the path relative to the html5game folder
+                // This strips everything before 'html5game/' regardless of the repo name
+                const relativePath = url.pathname.substring(url.pathname.indexOf('html5game/'));
+                
+                const file = zip.file(relativePath);
+                if (!file) {
+                    console.warn(`[SW] Not in ZIP: ${relativePath}`);
+                    return fetch(event.request);
+                }
 
-            const content = await file.async('uint8array');
-            const ext = relativePath.split('.').pop().toLowerCase();
-            const type = (ext === 'ogg') ? 'audio/ogg' : 'application/octet-stream'; 
+                const content = await file.async('uint8array');
+                const ext = relativePath.split('.').pop().toLowerCase();
+                const type = mimeTypes[ext] || 'application/octet-stream';
 
-            return new Response(content, { headers: { 'Content-Type': type } });
+                return new Response(content, {
+                    status: 200,
+                    headers: { 
+                        'Content-Type': type,
+                        'Content-Length': content.length.toString()
+                    }
+                });
+            } catch (err) {
+                return fetch(event.request);
+            }
         })());
+        return; // Exit fetch listener
+    }
+
+    // Handle the UT.js chunks (also path-aware)
+    if (url.pathname.endsWith('UT.js')) {
+        event.respondWith(getJoinedEngine());
     }
 });
