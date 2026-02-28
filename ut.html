@@ -50,33 +50,52 @@
 
     <script>
         // 1. ALLOW SYSTEM KEYS
-        // We intercept the keydown event before GameMaker can stop it
         window.addEventListener("keydown", function(e) {
-            // List of keys we want the BROWSER to keep
-            // F5 (Reload), F11 (Fullscreen), F12 (DevTools), Ctrl+R (Reload)
             if ([116, 122, 123].includes(e.keyCode) || (e.ctrlKey && e.keyCode === 82)) {
                 e.stopImmediatePropagation();
             }
-        }, true); // The "true" ensures we catch it before GameMaker
-
-        // 2. SERVICE WORKER & LOADING
+        }, true);
+        
+        // 2. SMARTER SERVICE WORKER REGISTRATION
+        function startApp() {
+            // If the SW is already in control, just load the game
+            if (navigator.serviceWorker.controller) {
+                console.log("SW already in control. Loading game...");
+                loadGame();
+            } else {
+                // If not, wait for the SW to take control
+                console.log("Waiting for SW to take control...");
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    console.log("SW now in control. Loading game...");
+                    loadGame();
+                });
+            }
+        }
+        
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(reg => {
-                navigator.serviceWorker.ready.then(() => loadGame());
-            }).catch(err => loadGame());
+                // Check if we need to trigger startApp or if it's already handled
+                startApp();
+            }).catch(err => {
+                console.error("SW Registration failed, falling back:", err);
+                loadGame();
+            });
         } else {
             loadGame();
         }
-
+        
         function loadGame() {
+            // Only proceed if we haven't already loaded the script
+            if (document.getElementById('engine-script')) return;
+        
             const script = document.createElement('script');
+            script.id = 'engine-script';
             script.type = 'text/javascript';
             script.src = './UT.js'; 
-
+        
             script.onload = () => {
                 if (typeof GameMaker_Init === "function") {
                     GameMaker_Init();
-                    // Ensure the canvas stays focused for input
                     document.getElementById("canvas").focus();
                 }
             };
@@ -85,3 +104,4 @@
     </script>
 </body>
 </html>
+
